@@ -1,0 +1,16 @@
+{
+  "name": "cpu",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch .",
+    "build": "tsc"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "devDependencies": {
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}
