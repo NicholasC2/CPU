@@ -1,0 +1,41 @@
+#bankdef ram
+{
+    #bits 16
+    #addr 0
+    #outp 0
+}
+
+#bank ram
+
+#ruledef
+{
+    nop
+        => 0x0000
+
+    jump {addr:u16}
+        => (0x0001 @ addr)
+
+    jtrue {value:u16}, {addr:u16}
+        => (0x0002 @ value @ addr)
+
+    jfalse {value:u16}, {addr:u16}
+        => (0x0003 @ value @ addr)
+
+    jeq {value:u16}, {compareAddr:u16}, {jumpAddr:u16}
+        => (0x0004 @ value @ compareAddr @ jumpAddr)
+
+    rndna {dest:u16}
+        => (0x0011 @ dest)
+
+    rndj
+        => 0x0012
+
+    vrus
+        => 0x0013
+
+    rndfill {start:u16}, {length:u16}
+    => (0x0014 @ start @ length)
+
+    wait {ms:u16}
+        => (0x0015 @ ms)
+}

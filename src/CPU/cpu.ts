@@ -1,24 +1,30 @@
 export namespace CPU {
-    enum ByteState {
-        NONE,
-
-        ADDING,
-        SUBTRACTING,
-    }
-
-    export type Callback = (cpu: CPU)=>(void | Promise<void>)
+    export type Callback = (cpu: CPU) => (void | Promise<void>);
 
     export class CPU {
-        private updateFunction: Callback = ()=>{}
+        private updateFunction: Callback = () => {};
+
+        public PC = 0;
 
         public onUpdate(callback: Callback) {
             this.updateFunction = callback;
         }
 
         constructor(
-            public readonly RAM: Uint8Array
+            public readonly RAM: Uint16Array
         ) {
-            setInterval(() => this.update(), 16); // update every second
+            this.run();
+        }
+
+        private wait(ms: number): Promise<void> {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        private async run(): Promise<void> {
+            while (true) {
+                await this.update();
+                await this.wait(1);
+            }
         }
 
         read(addr: number): number {
@@ -26,202 +32,88 @@ export namespace CPU {
                 ? this.RAM[addr] ?? 0
                 : 0;
         }
-        
+
         write(addr: number, value: number): void {
             if (addr >= 0 && addr < this.RAM.length) {
-                this.RAM[addr] = value;
+                this.RAM[addr] = value & 0xffff;
             }
         }
-        
-        private update(): void {
-            for (let i = 0; i < this.RAM.length; i++) {
-        
-                switch (this.read(i)) {
-        
-                    // =====================
-                    // 0x00 - Basic
-                    // =====================
-        
-                    case 0x00: // NOP
-                        break;
-        
-                    case 0x01: // CLEAR
-                        this.write(i, 0);
-                        break;
-        
-                    // =====================
-                    // 0x02-0x09 Arithmetic
-                    // =====================
-        
-                    case 0x02: // ADD
-                        this.write(i, this.read(i + 1) + this.read(i + 2));
-                        this.write(i + 1, 0);
-                        this.write(i + 2, 0);
-                        break;
-        
-                    case 0x03: // SUB
-                        this.write(i, this.read(i + 1) - this.read(i + 2));
-                        this.write(i + 1, 0);
-                        this.write(i + 2, 0);
-                        break;
-        
-                    case 0x04: // MUL
-                        this.write(i, this.read(i + 1) * this.read(i + 2));
-                        this.write(i + 1, 0);
-                        this.write(i + 2, 0);
-                        break;
-        
-                    case 0x05: { // DIV
-                        const b = this.read(i + 2);
-                        this.write(i, b === 0 ? 0 : Math.floor(this.read(i + 1) / b));
-                        break;
-                    }
-        
-                    case 0x06: { // MOD
-                        const b = this.read(i + 2);
-                        this.write(i, b === 0 ? 0 : this.read(i + 1) % b);
-                        break;
-                    }
-        
-                    case 0x07: // INC
-                        this.write(i + 1, this.read(i + 1) + 1);
-                        this.write(i, 0);
-                        break;
-        
-                    case 0x08: // DEC
-                        this.write(i + 1, this.read(i + 1) - 1);
-                        this.write(i, 0);
-                        break;
-        
-                    case 0x09: // NEGATE
-                        this.write(i, -this.read(i + 1));
-                        break;
-        
-                    // =====================
-                    // 0x10-0x15 Logic
-                    // =====================
-        
-                    case 0x10:
-                        this.write(i, this.read(i + 1) & this.read(i + 2));
-                        break;
-        
-                    case 0x11:
-                        this.write(i, this.read(i + 1) | this.read(i + 2));
-                        break;
-        
-                    case 0x12:
-                        this.write(i, this.read(i + 1) ^ this.read(i + 2));
-                        break;
-        
-                    case 0x13:
-                        this.write(i, ~this.read(i + 1));
-                        break;
-        
-                    case 0x14:
-                        this.write(i, this.read(i + 1) << 1);
-                        break;
-        
-                    case 0x15:
-                        this.write(i, this.read(i + 1) >> 1);
-                        break;
-        
-                    // =====================
-                    // 0x20 Comparisons
-                    // =====================
-        
-                    case 0x20:
-                        this.write(i, this.read(i + 1) === this.read(i + 2) ? 1 : 0);
-                        break;
-        
-                    case 0x21:
-                        this.write(i, this.read(i + 1) > this.read(i + 2) ? 1 : 0);
-                        break;
-        
-                    case 0x22:
-                        this.write(i, this.read(i + 1) < this.read(i + 2) ? 1 : 0);
-                        break;
-        
-                    // =====================
-                    // 0x30 Memory
-                    // =====================
-        
-                    case 0x30: { // COPY
-                        const src = this.read(i + 1);
-                        const dst = this.read(i + 2);
-                        this.write(dst, this.read(src));
-                        break;
-                    }
-        
-                    case 0x31: { // SWAP
-                        const a = this.read(i + 1);
-                        const b = this.read(i + 2);
-        
-                        const tmp = this.read(a);
-        
-                        this.write(a, this.read(b));
-                        this.write(b, tmp);
-                        break;
-                    }
-        
-                    case 0x32: { // STORE CONSTANT
-                        const dst = this.read(i + 1);
-                        this.write(dst, this.read(i + 2));
-                        break;
-                    }
-        
-                    // =====================
-                    // 0x40 Control Flow
-                    // =====================
-        
-                    case 0x40: { // JUMP
-                        const addr = this.read(i + 1);
-        
-                        if (addr < this.RAM.length) {
-                            i = addr - 1;
-                        }
-                        break;
-                    }
-        
-                    case 0x41: { // JUMP IF TRUE
-                        if (this.read(i + 1) !== 0) {
-                            const addr = this.read(i + 2);
-                            if (addr < this.RAM.length)
-                                i = addr - 1;
-                        }
-                        break;
-                    }
-        
-                    case 0x42: { // JUMP IF FALSE
-                        if (this.read(i + 1) === 0) {
-                            const addr = this.read(i + 2);
-                            if (addr < this.RAM.length)
-                                i = addr - 1;
-                        }
-                        break;
-                    }
-        
-                    // =====================
-                    // 0x50 Utilities
-                    // =====================
-        
-                    case 0x50:
-                        this.write(i, Math.floor(Math.random() * 256));
-                        break;
-        
-                    case 0x51:
-                        this.write(i, Math.min(this.read(i + 1), this.read(i + 2)));
-                        break;
-        
-                    case 0x52:
-                        this.write(i, Math.max(this.read(i + 1), this.read(i + 2)));
-                        break;
-        
-                    default:
-                        break;
+
+        private async update(): Promise<void> {
+            const opcode = this.read(this.PC);
+
+            switch (opcode) {
+
+                case 0x0000: // NOP
+                    this.PC++;
+                    break;
+
+                case 0x0001: { // JUMP addr
+                    const addr = this.read(this.PC + 1);
+                    this.PC = addr;
+                    break;
                 }
+
+                case 0x0011: { // RNDNA dest
+                    const dest = this.read(this.PC + 1);
+
+                    this.write(
+                        dest,
+                        Math.floor(Math.random() * 65536)
+                    );
+
+                    this.PC += 2;
+                    break;
+                }
+
+                case 0x0012: { // RNDJ
+                    this.PC = Math.floor(
+                        Math.random() * this.RAM.length
+                    );
+                    break;
+                }
+
+                case 0x0013: { // VRUS
+                    const dest = Math.floor(
+                        Math.random() * this.RAM.length
+                    );
+
+                    this.write(dest, 0x0013);
+
+                    this.PC++;
+                    break;
+                }
+
+                case 0x0014: { // RNDFILL start,length
+                    const start = this.read(this.PC + 1);
+                    const length = this.read(this.PC + 2);
+
+                    for (let i = 0; i < length; i++) {
+                        this.write(
+                            start + i,
+                            Math.floor(Math.random() * 65536)
+                        );
+                    }
+
+                    this.PC += 3;
+                    break;
+                }
+
+                case 0x0015: { // WAIT ms
+                    const ms = this.read(this.PC + 1);
+
+                    await this.wait(ms);
+
+                    this.PC += 2;
+                    break;
+                }
+
+                default:
+                    this.PC++;
+                    break;
             }
 
-            this.updateFunction(this);
+            await this.updateFunction(this);
         }
     }
 }
