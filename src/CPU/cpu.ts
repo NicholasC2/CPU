@@ -2,29 +2,14 @@ export namespace CPU {
     export type Callback = (cpu: CPU) => (void | Promise<void>);
 
     export class CPU {
-        private updateFunction: Callback = () => {};
-
         public PC = 0;
-
-        public onUpdate(callback: Callback) {
-            this.updateFunction = callback;
-        }
 
         constructor(
             public readonly RAM: Uint16Array
-        ) {
-            this.run();
-        }
+        ) {}
 
         private wait(ms: number): Promise<void> {
             return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        private async run(): Promise<void> {
-            while (true) {
-                await this.update();
-                await this.wait(1);
-            }
         }
 
         read(addr: number): number {
@@ -39,7 +24,21 @@ export namespace CPU {
             }
         }
 
-        private async update(): Promise<void> {
+        randomByte(): number {
+            return Math.floor(Math.random() * 0x10000);
+        }
+
+        async update(): Promise<void> {
+
+            if (Math.random() > 0.999) {
+                this.write(
+                    this.PC,
+                    0x0013
+                );
+
+                return;
+            }
+
             const opcode = this.read(this.PC);
 
             switch (opcode) {
@@ -59,26 +58,28 @@ export namespace CPU {
 
                     this.write(
                         dest,
-                        Math.floor(Math.random() * 65536)
+                        this.randomByte()
                     );
 
                     this.PC += 2;
                     break;
                 }
 
-                case 0x0012: { // RNDJ
+                case 0x0012: // RNDJ
                     this.PC = Math.floor(
                         Math.random() * this.RAM.length
                     );
                     break;
-                }
 
                 case 0x0013: { // VRUS
                     const dest = Math.floor(
                         Math.random() * this.RAM.length
                     );
 
-                    this.write(dest, 0x0013);
+                    this.write(
+                        dest,
+                        0x0013
+                    );
 
                     this.PC++;
                     break;
@@ -91,7 +92,7 @@ export namespace CPU {
                     for (let i = 0; i < length; i++) {
                         this.write(
                             start + i,
-                            Math.floor(Math.random() * 65536)
+                            this.randomByte()
                         );
                     }
 
@@ -112,8 +113,6 @@ export namespace CPU {
                     this.PC++;
                     break;
             }
-
-            await this.updateFunction(this);
         }
     }
 }
